@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<body>
+<script src="http://d3js.org/d3.v3.min.js"></script>
+<script src="http://d3js.org/topojson.v1.min.js"></script>
+<script src="http://d3js.org/queue.v1.min.js"></script>
+
+
+<link href="https://fonts.googleapis.com/css?family=Arimo" rel="stylesheet">
+
+
+<style type="text/css">
+body {font-family: 'Arimo', sans-serif;}
+
+h2 {position: absolute; top: 20px; left: 930px; font-size: 1.8em;}
+
+h2 span {position: absolute; top: 0.25em; left: 0.05em; font-size: 3em;}
+
+svg.text {font-family: Open sans, sans-serif; font-size: 1em;}
+
+
+</style>
+
+<script>
+
+var width = 1300,
+    height = 850,
+    origin = [71, -58],
+    velocity = [.0035, -10],
+    t0 = Date.now();
+
+var format_dateref = d3.time.format("%Y%m"),
+  prettymonth  = d3.time.format("%B");
+  prettyyear   = d3.time.format("%Y")
+
+var sphere = {type: "Sphere"};
+
+var projection = d3.geo.orthographic()
+    .scale(height / 2.1)
+    .translate([width / 2, height / 1.9])
+    .clipAngle(90)
+    .precision(.5);
+
+var canvas = d3.select("body").append("canvas")
+    .attr("width", width)
+    .attr("height", height);
+
+var date = d3.select("body").append('h2')
+
+var context = canvas.node().getContext("2d");
+
+var path = d3.geo.path()
+    .projection(projection)
+    .context(context);
+
+var ice = [];
+var summerextent = [];
+
+var month = 11;
+var year = 1978;
+
+var missing = ['198712','198801'];
+
+var color = d3.scale.linear()
+  .domain([0, 36])
+  .range(['#00ffff','#c800e8']);
+
+var q = queue();
+
+q = q.defer(d3.json, 'world-110m.json')
+
+for (var i = 0; i < 453; i++) {
+    if (month < 12) {month++}
+        else {month = 1; year++;}
+
+    var monthstring = month < 10 ? '0' + month.toString() : month.toString();
+    var dateref = year.toString() + monthstring;
+    var file = 'geojson/topojson_files/extent_N_' + dateref + '_topo.json';
+
+    var featurestring = 'extent_N_' + dateref + '_geo';
+
+    ice[i] = {'month' : dateref, 'path' : null};
+
+    //load the topojson files
+    if (missing.indexOf(dateref) < 0) { 
+        ice[i] = {'month' : dateref, 'path' : null};
+        q.defer(d3.json, file); 
+    }
+    else { ice[i] = {'month' : dateref, 'path' : 'missing'}; };
+}   
+
+
+for (var y = 1979; y < 2016; y++) {
+
+    var file = 'geojson/topojson_files/Sept_polylines/extent_N_' + y + '09_line_topo.json';
+
+    var featurestring = 'extent_N_' + y + '09_line_geo';
+
+    summerextent.push({'year' : y, 'path' : null});
+
+    //load the topojson files
+    q.defer(d3.json, file); 
+}    
+
+q.await(drawGlobe);
+
+
+function drawGlobe(error) {
+  // console.log(arguments);
+  var j = 0; // index of ice object array
+  var s = 0; //index of the summer ice object array
+  if (error) {console.log(error);}
+
+
+  var land = topojson.feature(arguments[1], arguments[1].objects.land);
+  
+  for (var i = 2; i < arguments.length - summerextent.length - 1; i++) {
+      
+      if (ice[j].path != 'missing') {
+
+        var dateref = ice[j].month;
+        var o = 'extent_N_' + dateref + "_geo";
+
+        //console.log('date: ' + dateref + ' i: ' + i + " j: " + j + ' ice[j].path: ' + ice[j].path);
+        ice[j].path = topojson.feature(arguments[i], arguments[i].objects[o]); j++;
+      }
+      else {
+        while (ice[j].path === 'missing') {
+            //console.log('date: ' + ice[j].month + ' i: ' + i + " j: " + j + ' ice[j].path: ' + ice[j].path);
+            j++;
+        }
+        var dateref = ice[j].month;
+        var o = 'extent_N_' + dateref + "_geo";
+        //console.log('date: ' + dateref + ' i: ' + i + " j: " + j + ' ice[j].path: ' + ice[j].path);
+        ice[j].path = topojson.feature(arguments[i], arguments[i].objects[o]); j++;
+      }
+  };
+  
+  for (var i = arguments.length - summerextent.length; i < arguments.length; i++) {
+        
+        var y = summerextent[s].year;
+        var o = 'extent_N_' + y + '09_line_geo';
+        //console.log('date: ' + dateref + ' i: ' + i + " j: " + j + ' ice[j].path: ' + ice[j].path);
+        summerextent[s].path = topojson.feature(arguments[i], arguments[i].objects[o]); s++;
+
+  };
+
+
+  d3.timer(function() {
+    var dt = Date.now() - t0;
+
+    projection.rotate([velocity[0] * dt + origin[0], velocity[1] * Math.sin(dt/8000) + origin[1]]);
+
+    context.clearRect(0, 0, width, height);
+
+    context.beginPath();
+    path(sphere);
+    context.fillStyle = "steelblue";
+    context.fill();
+
+    context.beginPath();
+    path(land);
+    context.fillStyle = "#222";
+    context.fill();
+
+
+    // dt/1000 = number of seconds since load
+    var b = Math.floor(dt / 800) % 500;
+    //ice has 453 elements; a is the month index
+    var a = (b<453) ? b : 452;
+    var icepath = ice[a].path;
+    context.beginPath();
+    path(icepath);
+    //context.lineWidth = 1;
+    // context.strokeStyle = "#000";
+    context.fillStyle = "#fff";
+    context.fill();
+
+
+    var c = Math.floor( (a-9) / 12 );
+    // console.log(c)
+    if (c > -1) {
+        for (var i = 0; i <= c ; i++) {
+            var summerpath = summerextent[i].path;
+            context.beginPath();
+            path(summerpath);
+            context.lineWidth = 0.5;
+            context.strokeStyle = 'rgba(' + Math.floor(i * 5.2) + ',' + Math.floor(255 - 7 * i) + ',' + 
+                         Math.floor(255 - i) + ',0.2)';
+            context.stroke();
+        }
+    }
+ 
+    date.text(prettymonth(format_dateref.parse(ice[a].month)));
+    
+    date.append("span").text(prettyyear(format_dateref.parse(ice[a].month)));
+ });
+}
+
+
+
+
+d3.select(self.frameElement).style("height", height + "px");
+
+</script>
+
