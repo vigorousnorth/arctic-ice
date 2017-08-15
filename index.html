@@ -69,7 +69,7 @@ var q = queue();
 
 q = q.defer(d3.json, 'world-110m.json')
 
-for (var i = 0; i < 453; i++) {
+for (var i = 0; i < 454; i++) {
     if (month < 12) {month++}
         else {month = 1; year++;}
 
@@ -90,7 +90,7 @@ for (var i = 0; i < 453; i++) {
 }   
 
 
-for (var y = 1979; y < 2016; y++) {
+for (var y = 1979; y < 2017; y++) {
 
     var file = 'topojson_files/Sept_polylines/extent_N_' + y + '09_line_topo.json';
 
@@ -114,15 +114,19 @@ function drawGlobe(error) {
 
   var land = topojson.feature(arguments[1], arguments[1].objects.land);
   
-  for (var i = 2; i < arguments.length - summerextent.length - 1; i++) {
+  for (var i = 2; i < arguments.length - summerextent.length; i++) {
       
       if (ice[j].path != 'missing') {
 
         var dateref = ice[j].month;
         var o = 'extent_N_' + dateref + "_geo";
+        
+        
+        // console.log('date: ' + dateref + ' i: ' + i + " j: " + j + ' ice[j].path: ' + ice[j].path);
 
-        //console.log('date: ' + dateref + ' i: ' + i + " j: " + j + ' ice[j].path: ' + ice[j].path);
         ice[j].path = topojson.feature(arguments[i], arguments[i].objects[o]); j++;
+        
+        
       }
       else {
         while (ice[j].path === 'missing') {
@@ -165,9 +169,9 @@ function drawGlobe(error) {
 
 
     // dt/1000 = number of seconds since load
-    var b = Math.floor(dt / 800) % 500;
+    var b = Math.floor(dt / 320) % 500;
     //ice has 453 elements; a is the month index
-    var a = (b<453) ? b : 452;
+    var a = (b<454) ? b : 453;
     var icepath = ice[a].path;
     context.beginPath();
     path(icepath);
